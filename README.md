@@ -1,4 +1,4 @@
-# Ketikin Editor Core
+# Ketikin Editor Core [DEVELOPMENT PHASE]
 
 Professional Canvas-based Document Editor for React/HTML5, but especially for KetikinAI.
 
