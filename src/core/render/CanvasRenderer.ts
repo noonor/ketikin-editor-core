@@ -144,7 +144,7 @@ export class CanvasRenderer {
           ctx.fillRect(char.x, line.y, char.width, line.height);
         }
 
-        const fontName = el?.fontFamily || 'Arial';
+        const fontName = el?.fontFamily || 'Calibri';
         ctx.font = `${char.italic ? 'italic ' : ''}${char.bold ? 'bold ' : ''}${char.fontSize}px ${fontName}`;
         ctx.fillStyle = char.color || 'black';
         ctx.fillText(char.char, char.x, char.y + char.ascent);

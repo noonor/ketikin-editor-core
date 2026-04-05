@@ -31,7 +31,7 @@ export class Editor {
     this.container = container;
     this.elements = JSON.parse(JSON.stringify(initialElements));
     if (this.elements.length === 0) {
-      this.elements.push({ text: '\n', fontSize: 16, color: '#000000' });
+      this.elements.push({ text: '\n', fontSize: 12, fontFamily: 'Calibri', color: '#000000' });
     }
 
     this.history = new HistoryManager(this.elements);
@@ -39,8 +39,8 @@ export class Editor {
     this.inputHandler = new InputHandler(this);
 
     this.config = {
-      width: 816, height: 1056,
-      padding: { top: 72, bottom: 72, left: 72, right: 72 }
+      width: 794, height: 1123,
+      padding: { top: 96, bottom: 96, left: 96, right: 96 }
     };
 
     if (schemaConfig?.setup) {
@@ -88,7 +88,7 @@ export class Editor {
 
   public loadContent(newElements: DocElement[]) {
     this.elements = JSON.parse(JSON.stringify(newElements));
-    if (this.elements.length === 0) this.elements.push({ text: '\n', fontSize: 16, color: '#000000' });
+    if (this.elements.length === 0) this.elements.push({ text: '\n', fontSize: 12, fontFamily: 'Calibri', color: '#000000' });
     this.caretIndex = 0;
     this.selection = null;
     this.pendingFormat = null;
@@ -131,7 +131,7 @@ export class Editor {
     if (imgW > maxW) { imgW = maxW; imgH = imgW / ratio; }
     if (imgH > maxH * 0.8) { imgH = maxH * 0.8; imgW = imgH * ratio; }
 
-    const imgEl: DocElement = { elementType: 'image', imageUrl: dataUrl, imageWidth: imgW, imageHeight: imgH, text: '\n', fontSize: 16 };
+    const imgEl: DocElement = { elementType: 'image', imageUrl: dataUrl, imageWidth: imgW, imageHeight: imgH, text: '\n', fontSize: 12, fontFamily: 'Calibri' };
     let currentTotal = 0, insertIdx = this.elements.length;
     for (let i = 0; i < this.elements.length; i++) {
       if (this.caretIndex <= currentTotal + this.elements[i].text.length) { insertIdx = i + 1; break; }
@@ -445,7 +445,7 @@ export class Editor {
 
   /** Builds a new DocElement inheriting the pending format (without text/image fields). */
   private _newPendingEl(text: string, fallback: DocElement): DocElement {
-    const base: Partial<DocElement> = { fontSize: fallback.fontSize || 16 };
+    const base: Partial<DocElement> = { fontSize: fallback.fontSize || 12 };
     for (const k of this._fmtKeys) {
       const v = (this.pendingFormat as any)?.[k];
       if (v !== undefined) (base as any)[k] = v;
@@ -707,7 +707,7 @@ export class Editor {
 
   // ── FORMATTING ────────────────────────────────────────────────────────────
   public clearFormatting() {
-    const clean = { bold: false, italic: false, underline: false, strikethrough: false, subscript: false, superscript: false, backgroundColor: undefined as any, color: '#000000', fontSize: 16, fontFamily: 'Arial', align: 'left' as const };
+    const clean = { bold: false, italic: false, underline: false, strikethrough: false, subscript: false, superscript: false, backgroundColor: undefined as any, color: '#000000', fontSize: 12, fontFamily: 'Calibri', align: 'left' as const };
     this.applyFormat(clean);
   }
 
@@ -755,8 +755,8 @@ export class Editor {
   public applyStyle(style: 'Normal' | 'NoSpacing' | 'Heading1' | 'Heading2' | 'Heading3') {
     this.history.pushHistory(this.elements);
     const styleMap: Record<string, Partial<DocElement>> = {
-      Normal:    { fontSize: 16, bold: false, italic: false, fontFamily: 'Arial',   lineHeight: 1.15, spacingAfter: 8,  headingLevel: undefined },
-      NoSpacing: { fontSize: 16, bold: false, italic: false, fontFamily: 'Arial',   lineHeight: 1.0,  spacingAfter: 0,  headingLevel: undefined },
+      Normal:    { fontSize: 12, bold: false, italic: false, fontFamily: 'Calibri',   lineHeight: 1.15, spacingAfter: 8,  headingLevel: undefined },
+      NoSpacing: { fontSize: 12, bold: false, italic: false, fontFamily: 'Calibri',   lineHeight: 1.0,  spacingAfter: 0,  headingLevel: undefined },
       Heading1:  { fontSize: 28, bold: true,  italic: false, fontFamily: 'Calibri', lineHeight: 1.15, spacingAfter: 12, headingLevel: 1 },
       Heading2:  { fontSize: 22, bold: true,  italic: false, fontFamily: 'Calibri', lineHeight: 1.15, spacingAfter: 8,  headingLevel: 2 },
       Heading3:  { fontSize: 18, bold: true,  italic: true,  fontFamily: 'Calibri', lineHeight: 1.15, spacingAfter: 6,  headingLevel: 3 },

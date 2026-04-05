@@ -5,9 +5,9 @@ export function textToElements(text: string): DocElement[] {
   const elements: DocElement[] = [];
   const lines = text.split('\n');
   lines.forEach((line, idx) => {
-    elements.push({ text: line + (idx < lines.length - 1 ? '\n' : ''), fontSize: 16, color: '#000000' });
+    elements.push({ text: line + (idx < lines.length - 1 ? '\n' : ''), fontSize: 12, fontFamily: 'Calibri', color: '#000000' });
   });
-  if (elements.length === 0) elements.push({ text: '\n', fontSize: 16, color: '#000000' });
+  if (elements.length === 0) elements.push({ text: '\n', fontSize: 12, fontFamily: 'Calibri', color: '#000000' });
   return elements;
 }
 
@@ -93,7 +93,7 @@ export function htmlToElements(html: string): DocElement[] {
       if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
         const level = parseInt(tag[1]) as any;
         const shapes: Record<number, number> = { 1: 32, 2: 24, 3: 20, 4: 18, 5: 16, 6: 14 };
-        newContext.fontSize = shapes[level] || 16;
+        newContext.fontSize = shapes[level] || 12;
         newContext.bold = true;
         newContext.headingLevel = level;
       }
@@ -123,8 +123,8 @@ export function htmlToElements(html: string): DocElement[] {
     }
   };
 
-  doc.body.childNodes.forEach(node => walkNode(node, { fontSize: 16, color: '#000000', align: 'left' }));
-  if (elements.length === 0) elements.push({ text: '\n', fontSize: 16, color: '#000000', align: 'left' });
+  doc.body.childNodes.forEach(node => walkNode(node, { fontSize: 12, fontFamily: 'Calibri', color: '#000000', align: 'left' }));
+  if (elements.length === 0) elements.push({ text: '\n', fontSize: 12, fontFamily: 'Calibri', color: '#000000', align: 'left' });
   return elements;
 }
 

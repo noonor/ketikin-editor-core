@@ -19,7 +19,7 @@ export class LayoutEngine {
   private getFontString(element: DocElement): string {
     const style = element.italic ? 'italic ' : '';
     const weight = element.bold ? 'bold ' : '';
-    return `${style}${weight}${element.fontSize}px ${element.fontFamily || 'Arial'}`;
+    return `${style}${weight}${element.fontSize}px ${element.fontFamily || 'Calibri'}`;
   }
 
   private applyLineAlignment(line: RenderLine, elements: DocElement[], maxWidth: number) {
@@ -249,10 +249,25 @@ export class LayoutEngine {
         if (word === '') return;
 
         if (word === '\t') {
-          const tabSize = 80;
+          const elementTabStopData = elements[elementIdx]?.tabStops;
+          
+          let nextTabX: number;
           const relativeX = currentX - this.config.padding.left;
-          const nextTabX = (Math.floor(relativeX / tabSize) + 1) * tabSize;
-          const charWidth = Math.max(10, (nextTabX + this.config.padding.left) - currentX);
+          
+          if (elementTabStopData && elementTabStopData.length > 0) {
+              const nextStop = elementTabStopData.find(ts => ts.position > relativeX);
+              if (nextStop) {
+                  nextTabX = this.config.padding.left + nextStop.position;
+              } else {
+                  const defaultTabStop = 48; // px
+                  nextTabX = this.config.padding.left + Math.ceil((relativeX + 1) / defaultTabStop) * defaultTabStop;
+              }
+          } else {
+              const defaultTabStop = 48; // px
+              nextTabX = this.config.padding.left + Math.ceil((relativeX + 1) / defaultTabStop) * defaultTabStop;
+          }
+
+          const charWidth = Math.max(10, nextTabX - currentX);
           
           const charHeight = element.fontSize * 1.2;
           const renderChar: RenderChar = {
@@ -304,7 +319,7 @@ export class LayoutEngine {
           const isSup = element.superscript;
           const displayFontSize = (isSub || isSup) ? element.fontSize * 0.65 : element.fontSize;
           
-          this.offscreenCtx.font = `${element.italic ? 'italic ' : ''}${element.bold ? 'bold ' : ''}${displayFontSize}px ${element.fontFamily || 'Arial'}`;
+          this.offscreenCtx.font = `${element.italic ? 'italic ' : ''}${element.bold ? 'bold ' : ''}${displayFontSize}px ${element.fontFamily || 'Calibri'}`;
           
           const charWidth = this.offscreenCtx.measureText(char).width;
           const charHeight = element.fontSize * 1.2;

@@ -84,6 +84,11 @@ export interface DocElement {
   
   listType?: 'bullet' | 'number';
   listLevel?: number;
+
+  tabStops?: Array<{
+    position: number;
+    type: 'left' | 'center' | 'right' | 'decimal';
+  }>;
 }
 
 export interface EditorConfig {

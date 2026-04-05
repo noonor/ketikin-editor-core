@@ -29,7 +29,7 @@ const FontFamilyDropdown: React.FC<{ editor: Editor | null }> = ({ editor }) => 
     const [open, setOpen] = useState(false);
     const [custom, setCustom] = useState('');
     const families = ['Arial', 'Calibri', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Trebuchet MS', 'Comic Sans MS'];
-    const current = (editor?.getActiveFormats() as any)?.fontFamily || 'Arial';
+    const current = (editor?.getActiveFormats() as any)?.fontFamily || 'Calibri';
     return (
         <div style={{ position: 'relative' }}>
             <div
@@ -67,22 +67,54 @@ const FontFamilyDropdown: React.FC<{ editor: Editor | null }> = ({ editor }) => 
 };
 
 const FontSizeInput: React.FC<{ editor: Editor | null }> = ({ editor }) => {
-    const [editing, setEditing] = useState(false);
-    const [val, setVal] = useState('');
-    const current = (editor?.getActiveFormats() as any)?.fontSize || 16;
-    return editing ? (
-        <input
-            autoFocus
-            value={val}
-            onChange={e => setVal(e.target.value)}
-            onBlur={() => { const n = parseInt(val); if (!isNaN(n) && n > 0) editor?.setFontSize(n); setEditing(false); }}
-            onKeyDown={e => { if (e.key === 'Enter') { const n = parseInt(val); if (!isNaN(n) && n > 0) editor?.setFontSize(n); setEditing(false); } if (e.key === 'Escape') setEditing(false); }}
-            style={{ ...ribbonDropdownStyle, width: '40px', textAlign: 'center' }}
-            className="ketikin-editor-ui"
-        />
-    ) : (
-        <div onClick={() => { setVal(String(current)); setEditing(true); }} style={{ ...ribbonDropdownStyle, width: '40px', textAlign: 'center', cursor: 'pointer' }} className="ketikin-editor-ui">
-            {current}
+    const [open, setOpen] = useState(false);
+    const [custom, setCustom] = useState('');
+    const sizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+    const currentSize = (editor?.getActiveFormats() as any)?.fontSize || 12;
+    const currentDisplay = Number(currentSize % 1 !== 0 ? currentSize.toFixed(1) : currentSize);
+
+    const applySize = (sizeStr: string) => {
+        const n = parseFloat(sizeStr);
+        if (!isNaN(n) && n > 0) editor?.setFontSize(n);
+        setOpen(false);
+        setCustom('');
+    };
+
+    return (
+        <div style={{ position: 'relative' }}>
+            <div
+                onClick={() => { setCustom(String(currentDisplay)); setOpen(o => !o); }}
+                style={{ ...ribbonDropdownStyle, width: '45px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                className="ketikin-editor-ui"
+            >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentDisplay}</span>
+                <IconChevronDown />
+            </div>
+            {open && (
+                <div className="ketikin-editor-ui" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 9999, backgroundColor: 'white', border: '1px solid #d2d0ce', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: '60px' }}>
+                    <div style={{ padding: '4px' }}>
+                        <input
+                            autoFocus
+                            value={custom}
+                            onChange={e => setCustom(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') applySize(custom); if (e.key === 'Escape') setOpen(false); }}
+                            placeholder="Size"
+                            style={{ width: '100%', fontSize: '13px', padding: '4px', border: '1px solid #d2d0ce', borderRadius: '3px', boxSizing: 'border-box' }}
+                        />
+                    </div>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                        {sizes.map(s => (
+                            <div
+                                key={s}
+                                onClick={() => applySize(String(s))}
+                                style={{ padding: '5px 10px', fontSize: '13px', cursor: 'pointer', backgroundColor: currentDisplay === s ? '#e8f0fe' : 'white' }}
+                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f3f2ff')}
+                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = currentDisplay === s ? '#e8f0fe' : 'white')}
+                            >{s}</div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
