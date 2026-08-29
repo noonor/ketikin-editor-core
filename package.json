@@ -20,9 +20,11 @@
   },
   "dependencies": {
     "jszip": "^3.10.1",
-    "pdfjs-dist": "^5.6.205",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "pdfjs-dist": "^5.6.205"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
   },
   "devDependencies": {
     "@types/jszip": "^3.4.0",

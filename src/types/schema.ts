@@ -106,7 +106,9 @@ export interface InlineFormat {
 export interface TextRun extends InlineFormat {
   text: string;
   trackChangeId?: string; // If this run was inserted via track changes
+  isCitationBadge?: boolean; // Interactive source badge/pill (e.g. [🔗 DOI])
 }
+
 
 export interface BlockStyle {
   align?: Alignment;

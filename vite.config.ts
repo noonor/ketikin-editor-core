@@ -18,7 +18,9 @@ export default defineConfig({
       fileName: (format) => `ketikin-editor.${format === 'es' ? 'js' : format === 'umd' ? 'umd.cjs' : format + '.js'}`,
     },
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      // Must externalize jsx-runtime as well, otherwise Rollup bundles React internals 
+      // which causes duplicate React instance errors in consumers like Next.js
+      external: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
       output: {
         globals: {
           react: 'React',
@@ -28,7 +30,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 5555,
     open: '/dev/index.html',
   },
 });

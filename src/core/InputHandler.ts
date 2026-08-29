@@ -35,13 +35,23 @@ export class InputHandler {
 
   private handleKeyDown(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey) {
-      if (e.key === 'z') { e.preventDefault(); this.editor.undo(); return; }
-      if (e.key === 'y') { e.preventDefault(); this.editor.redo(); return; }
-      if (e.key === 'a') { e.preventDefault(); this.editor.selectAll(); return; }
-      if (e.key === 'b') { e.preventDefault(); this.editor.toggleFormat('bold'); return; }
-      if (e.key === 'i') { e.preventDefault(); this.editor.toggleFormat('italic'); return; }
-      if (e.key === 'u') { e.preventDefault(); this.editor.toggleFormat('underline'); return; }
-      if (e.key === 's') { e.preventDefault(); (window as any).ketikinSave?.(); return; }
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); this.editor.setScale(Math.min(3, this.editor.getScale() + 0.1)); return; }
+      if (e.key === '-') { e.preventDefault(); this.editor.setScale(Math.max(0.25, this.editor.getScale() - 0.1)); return; }
+      if (e.key === '0') { e.preventDefault(); this.editor.setScale(1); return; }
+
+      const key = e.key.toLowerCase();
+      if (key === 'z') { e.preventDefault(); this.editor.undo(); return; }
+      if (key === 'y') { e.preventDefault(); this.editor.redo(); return; }
+      if (key === 'a') { e.preventDefault(); this.editor.selectAll(); return; }
+      if (key === 'b') { e.preventDefault(); this.editor.toggleFormat('bold'); return; }
+      if (key === 'i') { e.preventDefault(); this.editor.toggleFormat('italic'); return; }
+      if (key === 'u') { e.preventDefault(); this.editor.toggleFormat('underline'); return; }
+      if (key === 's') { e.preventDefault(); (window as any).ketikinSave?.(); return; }
+
+      if (key === 'l') { e.preventDefault(); this.editor.setAlignment('left'); return; }
+      if (key === 'e') { e.preventDefault(); this.editor.setAlignment('center'); return; }
+      if (key === 'r') { e.preventDefault(); this.editor.setAlignment('right'); return; }
+      if (key === 'j') { e.preventDefault(); this.editor.setAlignment('justify'); return; }
     }
     if (e.key === 'Backspace') { e.preventDefault(); this.editor.deleteBackward(); return; }
     if (e.key === 'Delete') { e.preventDefault(); this.editor.deleteForward(); return; }

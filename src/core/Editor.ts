@@ -9,7 +9,7 @@ export class Editor {
   public elements: DocElement[];
   private engine: RenderEngine;
   private pages: RenderPage[] = [];
-  private caretIndex: number = 0;
+  public caretIndex: number = 0;
   public pageContainers: HTMLElement[] = [];
   public pageWrappers: HTMLElement[] = [];
   private caretElement: HTMLDivElement | null = null;
@@ -29,9 +29,10 @@ export class Editor {
 
   constructor(container: HTMLElement, initialElements: DocElement[], schemaConfig?: Partial<KetikinDocument>) {
     this.container = container;
+    this.container.innerHTML = '';
     this.elements = JSON.parse(JSON.stringify(initialElements));
     if (this.elements.length === 0) {
-      this.elements.push({ text: '\n', fontSize: 12, fontFamily: 'Calibri', color: '#000000' });
+      this.elements.push({ text: '\n', fontSize: 12, fontFamily: 'Times New Roman', color: '#000000' });
     }
 
     this.history = new HistoryManager(this.elements);
@@ -68,8 +69,9 @@ export class Editor {
     this.container.tabIndex = 0;
     this.container.style.outline = 'none';
     this.inputHandler.attach();
-    setTimeout(() => this.container.focus(), 100);
+    setTimeout(() => this.container.focus({ preventScroll: true }), 50);
   }
+
 
   public getContainer() { return this.container; }
   public getScale() { return this.scale; }
@@ -88,7 +90,7 @@ export class Editor {
 
   public loadContent(newElements: DocElement[]) {
     this.elements = JSON.parse(JSON.stringify(newElements));
-    if (this.elements.length === 0) this.elements.push({ text: '\n', fontSize: 12, fontFamily: 'Calibri', color: '#000000' });
+    if (this.elements.length === 0) this.elements.push({ text: '\n', fontSize: 12, fontFamily: 'Times New Roman', color: '#000000' });
     this.caretIndex = 0;
     this.selection = null;
     this.pendingFormat = null;
@@ -131,7 +133,7 @@ export class Editor {
     if (imgW > maxW) { imgW = maxW; imgH = imgW / ratio; }
     if (imgH > maxH * 0.8) { imgH = maxH * 0.8; imgW = imgH * ratio; }
 
-    const imgEl: DocElement = { elementType: 'image', imageUrl: dataUrl, imageWidth: imgW, imageHeight: imgH, text: '\n', fontSize: 12, fontFamily: 'Calibri' };
+    const imgEl: DocElement = { elementType: 'image', imageUrl: dataUrl, imageWidth: imgW, imageHeight: imgH, text: '\n', fontSize: 12, fontFamily: 'Times New Roman' };
     let currentTotal = 0, insertIdx = this.elements.length;
     for (let i = 0; i < this.elements.length; i++) {
       if (this.caretIndex <= currentTotal + this.elements[i].text.length) { insertIdx = i + 1; break; }
@@ -238,6 +240,13 @@ export class Editor {
       const prevChar = allChars.find(c => c.charIndex === this.caretIndex - 1);
       const pageIdx = this.findPageIdxForChar(this.caretIndex);
 
+      const elIdx = this.getElementIndexForChar(this.caretIndex);
+      const elAlign = this.elements[elIdx]?.align || 'left';
+      const maxWidth = this.config.width - this.config.padding.left - this.config.padding.right;
+      let caretX = this.config.padding.left;
+      if (elAlign === 'center') caretX += maxWidth / 2;
+      else if (elAlign === 'right') caretX += maxWidth;
+
       if (prevChar && this.caretElement) {
         this.caretElement.style.height = `${prevChar.height}px`;
         if (prevChar.char === '\n' || prevChar.char === '\f') {
@@ -249,10 +258,10 @@ export class Editor {
           }
 
           if (targetLine) {
-            this.caretElement.style.left = `${this.config.padding.left}px`;
+            this.caretElement.style.left = `${caretX}px`;
             this.caretElement.style.top = `${targetLine.y}px`;
           } else {
-            this.caretElement.style.left = `${this.config.padding.left}px`;
+            this.caretElement.style.left = `${caretX}px`;
             this.caretElement.style.top = `${prevChar.y + prevChar.height}px`;
           }
         } else {
@@ -262,7 +271,7 @@ export class Editor {
       } else if (this.caretElement) {
         // First character of the document
         this.caretElement.style.height = '18px';
-        this.caretElement.style.left = `${this.config.padding.left}px`;
+        this.caretElement.style.left = `${caretX}px`;
         this.caretElement.style.top = `${this.config.padding.top}px`;
       }
 
@@ -506,6 +515,36 @@ export class Editor {
     this.render();
   }
 
+  public insertDocElements(newElements: DocElement[]) {
+    if (!newElements || newElements.length === 0) return;
+    this.history.pushHistory(this.elements);
+
+    // If editor only has initial blank newline, replace it
+    if (this.elements.length === 1 && (this.elements[0].text === '\n' || this.elements[0].text === '')) {
+      this.elements = JSON.parse(JSON.stringify(newElements));
+      this.caretIndex = this.elements.reduce((sum, el) => sum + el.text.length, 0);
+      this.render();
+      this.onChange?.();
+      return;
+    }
+
+    let currentTotal = 0;
+    let insertIdx = this.elements.length;
+    for (let i = 0; i < this.elements.length; i++) {
+      if (this.caretIndex <= currentTotal + this.elements[i].text.length) {
+        insertIdx = i + 1;
+        break;
+      }
+      currentTotal += this.elements[i].text.length;
+    }
+
+    this.elements.splice(insertIdx, 0, ...JSON.parse(JSON.stringify(newElements)));
+    this.caretIndex = this.elements.reduce((sum, el) => sum + el.text.length, 0);
+    this.render();
+    this.onChange?.();
+  }
+
+
 
   public deleteBackward() {
     if (this.selection && this.selection.start !== this.selection.end) { this.deleteSelection(); return; }
@@ -620,18 +659,26 @@ export class Editor {
   public applyFormat(props: Partial<DocElement>) {
     if (this.selection && this.selection.start !== this.selection.end) {
       this.history.pushHistory(this.elements);
-      const start = Math.min(this.selection.start, this.selection.end), end = Math.max(this.selection.start, this.selection.end);
+      const start = Math.min(this.selection.start, this.selection.end);
+      const end = Math.max(this.selection.start, this.selection.end);
+      
       let currentTotal = 0;
-      for (let i = 0; i < this.elements.length; i++) {
+      let i = 0;
+      while (i < this.elements.length) {
         const el = this.elements[i];
-        const elStart = currentTotal, elEnd = currentTotal + el.text.length;
-        const intersectStart = Math.max(start, elStart), intersectEnd = Math.min(end, elEnd);
+        const elStart = currentTotal;
+        const elEnd = currentTotal + el.text.length;
+        const intersectStart = Math.max(start, elStart);
+        const intersectEnd = Math.min(end, elEnd);
+        
         if (intersectStart < intersectEnd) {
           if (intersectStart > elStart) {
             const left = { ...el, text: el.text.substring(0, intersectStart - elStart) };
             el.text = el.text.substring(intersectStart - elStart);
             this.elements.splice(i, 0, left);
+            currentTotal += left.text.length;
             i++;
+            continue;
           }
           if (intersectEnd < elEnd) {
             const right = { ...el, text: el.text.substring(intersectEnd - intersectStart) };
@@ -640,7 +687,8 @@ export class Editor {
           }
           Object.assign(this.elements[i], props);
         }
-        currentTotal = elEnd;
+        currentTotal += this.elements[i].text.length;
+        i++;
       }
       this.render();
     } else {
@@ -649,23 +697,66 @@ export class Editor {
     }
   }
 
-  public setAlignment(align: any) {
-    if (this.selection) {
-      this.history.pushHistory(this.elements);
-      const start = Math.min(this.selection.start, this.selection.end), end = Math.max(this.selection.start, this.selection.end);
-      let currentTotal = 0;
-      for (let i = 0; i < this.elements.length; i++) {
-        const el = this.elements[i];
-        const elStart = currentTotal, elEnd = currentTotal + el.text.length;
-        if (elEnd > start && elStart < end) el.align = align;
-        currentTotal = elEnd;
-      }
-      this.render();
-    } else {
-      const elIdx = this.getElementIndexForChar(this.caretIndex);
-      this.elements[elIdx].align = align;
-      this.render();
+  public applyParagraphFormat(props: Partial<DocElement>) {
+    this.history.pushHistory(this.elements);
+    const fullText = this.getFullText();
+    let selStart = this.caretIndex;
+    let selEnd = this.caretIndex;
+    if (this.selection && this.selection.start !== this.selection.end) {
+      selStart = Math.min(this.selection.start, this.selection.end);
+      selEnd = Math.max(this.selection.start, this.selection.end);
     }
+    
+    let start = 0;
+    for (let i = selStart - 1; i >= 0; i--) {
+      if (fullText[i] === '\n' || fullText[i] === '\f') {
+        start = i + 1;
+        break;
+      }
+    }
+    
+    let end = fullText.length;
+    for (let i = selEnd; i < fullText.length; i++) {
+      if (fullText[i] === '\n' || fullText[i] === '\f') {
+        end = i + 1;
+        break;
+      }
+    }
+
+    let currentTotal = 0;
+    let i = 0;
+    while (i < this.elements.length) {
+      const el = this.elements[i];
+      const elStart = currentTotal;
+      const elEnd = currentTotal + el.text.length;
+      const intersectStart = Math.max(start, elStart);
+      const intersectEnd = Math.min(end, elEnd);
+      
+      if (intersectStart < intersectEnd || (el.text === '' && elStart >= start && elStart <= end)) {
+        if (intersectStart > elStart && intersectStart < elEnd) {
+          const left = { ...el, text: el.text.substring(0, intersectStart - elStart) };
+          el.text = el.text.substring(intersectStart - elStart);
+          this.elements.splice(i, 0, left);
+          currentTotal += left.text.length;
+          i++;
+          continue;
+        }
+        if (intersectEnd < elEnd) {
+          const right = { ...el, text: el.text.substring(intersectEnd - intersectStart) };
+          el.text = el.text.substring(0, intersectEnd - intersectStart);
+          this.elements.splice(i + 1, 0, right);
+        }
+        Object.assign(this.elements[i], props);
+      }
+      currentTotal += this.elements[i].text.length;
+      i++;
+    }
+    this.render();
+    this.onChange?.();
+  }
+
+  public setAlignment(align: any) {
+    this.applyParagraphFormat({ align });
   }
   private getElementIndexForChar(charIndex: number): number {
     let currentTotal = 0;
@@ -686,7 +777,7 @@ export class Editor {
   // ── CLIPBOARD ─────────────────────────────────────────────────────────────
   public copyToClipboard() {
     const text = this.getSelectedText();
-    if (text) navigator.clipboard?.writeText(text).catch(() => {});
+    if (text) navigator.clipboard?.writeText(text).catch(() => { });
   }
 
   public cutToClipboard() {
@@ -707,23 +798,17 @@ export class Editor {
 
   // ── FORMATTING ────────────────────────────────────────────────────────────
   public clearFormatting() {
-    const clean = { bold: false, italic: false, underline: false, strikethrough: false, subscript: false, superscript: false, backgroundColor: undefined as any, color: '#000000', fontSize: 12, fontFamily: 'Calibri', align: 'left' as const };
+    const clean = { bold: false, italic: false, underline: false, strikethrough: false, subscript: false, superscript: false, backgroundColor: undefined as any, color: '#000000', fontSize: 12, fontFamily: 'Times New Roman', align: 'left' as const };
     this.applyFormat(clean);
   }
 
   public setFontFamily(family: string) { this.applyFormat({ fontFamily: family }); }
-  public setFontSize(size: number)     { this.applyFormat({ fontSize: Math.max(1, size) }); }
-  public setFontColor(color: string)   { this.applyFormat({ color }); }
+  public setFontSize(size: number) { this.applyFormat({ fontSize: Math.max(1, size) }); }
+  public setFontColor(color: string) { this.applyFormat({ color }); }
   public setHighlightColor(color: string | undefined) { this.applyFormat({ backgroundColor: color }); }
 
   public setLineSpacing(lineHeight: number) {
-    const elIdx = this.getElementIndexForChar(this.caretIndex);
-    if (this.selection && this.selection.start !== this.selection.end) {
-      this.applyFormat({ lineHeight });
-    } else {
-      this.elements[elIdx].lineHeight = lineHeight;
-      this.render();
-    }
+    this.applyParagraphFormat({ lineHeight });
   }
 
   public changeCase(mode: 'upper' | 'lower' | 'title' | 'sentence' | 'toggle') {
@@ -739,11 +824,11 @@ export class Editor {
       if (is < ie) {
         const sel = el.text.substring(is - elStart, ie - elStart);
         let transformed = sel;
-        if (mode === 'upper')    transformed = sel.toUpperCase();
-        if (mode === 'lower')    transformed = sel.toLowerCase();
-        if (mode === 'title')    transformed = sel.replace(/\b\w/g, c => c.toUpperCase());
+        if (mode === 'upper') transformed = sel.toUpperCase();
+        if (mode === 'lower') transformed = sel.toLowerCase();
+        if (mode === 'title') transformed = sel.replace(/\b\w/g, c => c.toUpperCase());
         if (mode === 'sentence') transformed = sel.charAt(0).toUpperCase() + sel.slice(1).toLowerCase();
-        if (mode === 'toggle')   transformed = sel.split('').map(c => c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()).join('');
+        if (mode === 'toggle') transformed = sel.split('').map(c => c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()).join('');
         el.text = el.text.substring(0, is - elStart) + transformed + el.text.substring(ie - elStart);
       }
       currentTotal = elEnd;
@@ -755,42 +840,27 @@ export class Editor {
   public applyStyle(style: 'Normal' | 'NoSpacing' | 'Heading1' | 'Heading2' | 'Heading3') {
     this.history.pushHistory(this.elements);
     const styleMap: Record<string, Partial<DocElement>> = {
-      Normal:    { fontSize: 12, bold: false, italic: false, fontFamily: 'Calibri',   lineHeight: 1.15, spacingAfter: 8,  headingLevel: undefined },
-      NoSpacing: { fontSize: 12, bold: false, italic: false, fontFamily: 'Calibri',   lineHeight: 1.0,  spacingAfter: 0,  headingLevel: undefined },
-      Heading1:  { fontSize: 28, bold: true,  italic: false, fontFamily: 'Calibri', lineHeight: 1.15, spacingAfter: 12, headingLevel: 1 },
-      Heading2:  { fontSize: 22, bold: true,  italic: false, fontFamily: 'Calibri', lineHeight: 1.15, spacingAfter: 8,  headingLevel: 2 },
-      Heading3:  { fontSize: 18, bold: true,  italic: true,  fontFamily: 'Calibri', lineHeight: 1.15, spacingAfter: 6,  headingLevel: 3 },
+      Normal: { fontSize: 12, bold: false, italic: false, fontFamily: 'Times New Roman', lineHeight: 1.15, spacingAfter: 8, headingLevel: undefined },
+      NoSpacing: { fontSize: 12, bold: false, italic: false, fontFamily: 'Times New Roman', lineHeight: 1.0, spacingAfter: 0, headingLevel: undefined },
+      Heading1: { fontSize: 28, bold: true, italic: false, fontFamily: 'Times New Roman', lineHeight: 1.15, spacingAfter: 12, headingLevel: 1 },
+      Heading2: { fontSize: 22, bold: true, italic: false, fontFamily: 'Times New Roman', lineHeight: 1.15, spacingAfter: 8, headingLevel: 2 },
+      Heading3: { fontSize: 18, bold: true, italic: true, fontFamily: 'Times New Roman', lineHeight: 1.15, spacingAfter: 6, headingLevel: 3 },
     };
     const props = styleMap[style];
     if (!props) return;
 
-    // Apply to current paragraph (all elements on same logical line/paragraph)
-    if (this.selection && this.selection.start !== this.selection.end) {
-      this.applyFormat(props);
-    } else {
-      const elIdx = this.getElementIndexForChar(this.caretIndex);
-      Object.assign(this.elements[elIdx], props);
-      this.render();
-    }
-    this.history.pushHistory(this.elements);
-    this.onChange?.();
+    this.applyParagraphFormat(props);
   }
 
   // ── LISTS ─────────────────────────────────────────────────────────────────
   public toggleList(type: 'bullet' | 'number') {
-    this.history.pushHistory(this.elements);
     const elIdx = this.getElementIndexForChar(this.caretIndex);
     const el = this.elements[elIdx];
     if (el.listType === type) {
-      el.listType = undefined;
-      el.listLevel = undefined;
+      this.applyParagraphFormat({ listType: undefined, listLevel: undefined });
     } else {
-      el.listType = type;
-      el.listLevel = el.listLevel ?? 0;
+      this.applyParagraphFormat({ listType: type, listLevel: el.listLevel ?? 0 });
     }
-    this.render();
-    this.history.pushHistory(this.elements);
-    this.onChange?.();
   }
 
   // ── FIND & REPLACE ────────────────────────────────────────────────────────

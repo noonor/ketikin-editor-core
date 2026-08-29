@@ -19,7 +19,7 @@ export class LayoutEngine {
   private getFontString(element: DocElement): string {
     const style = element.italic ? 'italic ' : '';
     const weight = element.bold ? 'bold ' : '';
-    return `${style}${weight}${element.fontSize}px ${element.fontFamily || 'Calibri'}`;
+    return `${style}${weight}${element.fontSize}px ${element.fontFamily || 'Times New Roman'}`;
   }
 
   private applyLineAlignment(line: RenderLine, elements: DocElement[], maxWidth: number) {
@@ -30,7 +30,6 @@ export class LayoutEngine {
 
     const lastChar = line.chars[line.chars.length - 1];
     const isNewLine = lastChar.char === '\n' || lastChar.char === '\f';
-    if (isNewLine && line.chars.length === 1) return;
 
     const visibleLastChar = isNewLine && line.chars.length > 1 ? line.chars[line.chars.length - 2] : lastChar;
     const currentLineWidth = (visibleLastChar.x + visibleLastChar.width) - firstChar.x;
@@ -319,7 +318,7 @@ export class LayoutEngine {
           const isSup = element.superscript;
           const displayFontSize = (isSub || isSup) ? element.fontSize * 0.65 : element.fontSize;
           
-          this.offscreenCtx.font = `${element.italic ? 'italic ' : ''}${element.bold ? 'bold ' : ''}${displayFontSize}px ${element.fontFamily || 'Calibri'}`;
+          this.offscreenCtx.font = `${element.italic ? 'italic ' : ''}${element.bold ? 'bold ' : ''}${displayFontSize}px ${element.fontFamily || 'Times New Roman'}`;
           
           const charWidth = this.offscreenCtx.measureText(char).width;
           const charHeight = element.fontSize * 1.2;

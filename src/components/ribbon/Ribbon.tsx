@@ -1,463 +1,539 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Editor } from '../../core/Editor';
 import {
     IconBold, IconItalic, IconUnderline, IconUndo, IconRedo, IconExport,
-    IconPlus, IconMinus, IconAlignLeft, IconAlignCenter, IconAlignRight, IconAlignJustify,
-    IconPaste, IconCut, IconCopy, IconFormatPainter, IconStrikethrough, IconSubscript,
-    IconSuperscript, IconHighlight, IconFontColor, IconBulletList, IconNumberList,
-    IconLineSpacing, IconFind, IconReplace, IconSelect, IconClearFormatting, IconChevronDown,
-    IconBrightness, IconColor, IconArtistic, IconChange, IconRemoveBG, IconPosition, IconWrap,
-    IconBringForward, IconSendBackward, IconRotate, IconCrop, IconBorder, IconEffects, IconLayoutOptions
+    IconPlus, IconAlignLeft, IconAlignCenter, IconAlignRight, IconAlignJustify,
+    IconStrikethrough, IconSubscript,
+    IconSuperscript, IconHighlight, IconFontColor,
+    IconFind, IconClearFormatting, IconChevronDown,
+    IconPosition
 } from '../common/Icons';
-import {
-    ribbonGroupStyle, ribbonBtnStyle, ribbonLabelStyle, ribbonBigBtnStyle,
-    ribbonSmallBtnStyle, ribbonToolBtnStyle, ribbonDropdownStyle, galleryItemStyle
-} from '../common/Styles';
 
 interface RibbonProps {
     editor: Editor | null;
-    activeTab: string;
-    setActiveTab: (tab: string) => void;
+    activeTab?: string;
+    setActiveTab?: (tab: string) => void;
     onLayoutClick: () => void;
     onImportClick: () => void;
     onImageInsertClick?: () => void;
+    theme?: 'light' | 'dark';
 }
 
-// ── Small inline components ────────────────────────────────────────────────
+export const Ribbon: React.FC<RibbonProps> = ({ 
+    editor, 
+    onLayoutClick, 
+    onImportClick, 
+    onImageInsertClick,
+    theme = 'dark'
+}) => {
+    const isDark = theme !== 'light';
+    // Active Balloon Popover State: null | 'font' | 'paragraph' | 'insert' | 'layout' | 'find'
+    const [activeBalloon, setActiveBalloon] = useState<string | null>(null);
 
-const FontFamilyDropdown: React.FC<{ editor: Editor | null }> = ({ editor }) => {
-    const [open, setOpen] = useState(false);
-    const [custom, setCustom] = useState('');
-    const families = ['Arial', 'Calibri', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Trebuchet MS', 'Comic Sans MS'];
-    const current = (editor?.getActiveFormats() as any)?.fontFamily || 'Calibri';
-    return (
-        <div style={{ position: 'relative' }}>
-            <div
-                onClick={() => setOpen(o => !o)}
-                style={{ ...ribbonDropdownStyle, minWidth: '110px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                className="ketikin-editor-ui"
-            >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '90px' }}>{current}</span>
-                <IconChevronDown />
-            </div>
-            {open && (
-                <div className="ketikin-editor-ui" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 9999, backgroundColor: 'white', border: '1px solid #d2d0ce', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: '160px' }}>
-                    <div style={{ padding: '4px' }}>
-                        <input
-                            value={custom}
-                            onChange={e => setCustom(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && custom.trim()) { editor?.setFontFamily(custom.trim()); setOpen(false); setCustom(''); } }}
-                            placeholder="Custom font..."
-                            style={{ width: '100%', fontSize: '12px', padding: '4px', border: '1px solid #d2d0ce', borderRadius: '3px', boxSizing: 'border-box' }}
-                        />
-                    </div>
-                    {families.map(f => (
-                        <div
-                            key={f}
-                            onClick={() => { editor?.setFontFamily(f); setOpen(false); }}
-                            style={{ padding: '5px 10px', fontSize: '13px', fontFamily: f, cursor: 'pointer', backgroundColor: current === f ? '#e8f0fe' : 'white' }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f3f2ff')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = current === f ? '#e8f0fe' : 'white')}
-                        >{f}</div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
+    const toolbarRef = useRef<HTMLDivElement>(null);
 
-const FontSizeInput: React.FC<{ editor: Editor | null }> = ({ editor }) => {
-    const [open, setOpen] = useState(false);
-    const [custom, setCustom] = useState('');
-    const sizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
-    const currentSize = (editor?.getActiveFormats() as any)?.fontSize || 12;
-    const currentDisplay = Number(currentSize % 1 !== 0 ? currentSize.toFixed(1) : currentSize);
+    const fmt = (editor?.getActiveFormats() as any) || {};
 
-    const applySize = (sizeStr: string) => {
-        const n = parseFloat(sizeStr);
-        if (!isNaN(n) && n > 0) editor?.setFontSize(n);
-        setOpen(false);
-        setCustom('');
+    // Close balloon when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+                setActiveBalloon(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const toggleBalloon = (name: string) => {
+        setActiveBalloon(prev => prev === name ? null : name);
     };
 
-    return (
-        <div style={{ position: 'relative' }}>
-            <div
-                onClick={() => { setCustom(String(currentDisplay)); setOpen(o => !o); }}
-                style={{ ...ribbonDropdownStyle, width: '45px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                className="ketikin-editor-ui"
-            >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentDisplay}</span>
-                <IconChevronDown />
-            </div>
-            {open && (
-                <div className="ketikin-editor-ui" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 9999, backgroundColor: 'white', border: '1px solid #d2d0ce', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: '60px' }}>
-                    <div style={{ padding: '4px' }}>
-                        <input
-                            autoFocus
-                            value={custom}
-                            onChange={e => setCustom(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') applySize(custom); if (e.key === 'Escape') setOpen(false); }}
-                            placeholder="Size"
-                            style={{ width: '100%', fontSize: '13px', padding: '4px', border: '1px solid #d2d0ce', borderRadius: '3px', boxSizing: 'border-box' }}
-                        />
-                    </div>
-                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                        {sizes.map(s => (
-                            <div
-                                key={s}
-                                onClick={() => applySize(String(s))}
-                                style={{ padding: '5px 10px', fontSize: '13px', cursor: 'pointer', backgroundColor: currentDisplay === s ? '#e8f0fe' : 'white' }}
-                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f3f2ff')}
-                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = currentDisplay === s ? '#e8f0fe' : 'white')}
-                            >{s}</div>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
+    // Color pickers refs
+    const fontColorRef = useRef<HTMLInputElement>(null);
+    const highlightColorRef = useRef<HTMLInputElement>(null);
 
-const ColorPicker: React.FC<{ label: string; current?: string; onPick: (c: string) => void; icon: React.ReactNode }> = ({ current, onPick, icon }) => {
-    const ref = useRef<HTMLInputElement>(null);
-    return (
-        <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-            <button
-                onClick={() => ref.current?.click()}
-                style={{ ...ribbonToolBtnStyle, position: 'relative' }}
-                className="ketikin-editor-ui"
-                title="Pick color"
-            >
-                {icon}
-                <div style={{ height: '3px', background: current || '#000000', marginTop: '1px', borderRadius: '1px' }} />
-            </button>
-            <input
-                ref={ref}
-                type="color"
-                value={current || '#000000'}
-                onChange={e => onPick(e.target.value)}
-                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                className="ketikin-editor-ui"
-            />
-        </div>
-    );
-};
-
-const LineSpacingMenu: React.FC<{ editor: Editor | null }> = ({ editor }) => {
-    const [open, setOpen] = useState(false);
-    const options = [1.0, 1.15, 1.5, 2.0, 2.5, 3.0];
-    return (
-        <div style={{ position: 'relative' }}>
-            <button onClick={() => setOpen(o => !o)} style={ribbonToolBtnStyle} title="Line Spacing" className="ketikin-editor-ui"><IconLineSpacing /></button>
-            {open && (
-                <div className="ketikin-editor-ui" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 9999, backgroundColor: 'white', border: '1px solid #d2d0ce', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: '120px' }}>
-                    {options.map(o => (
-                        <div key={o} onClick={() => { editor?.setLineSpacing(o); setOpen(false); }}
-                            style={{ padding: '6px 12px', fontSize: '13px', cursor: 'pointer' }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f3f2f1')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'white')}
-                        >{o.toFixed(2)}</div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-
-const CaseMenu: React.FC<{ editor: Editor | null }> = ({ editor }) => {
-    const [open, setOpen] = useState(false);
-    const cases: { label: string; mode: 'upper' | 'lower' | 'title' | 'sentence' | 'toggle' }[] = [
-        { label: 'UPPERCASE', mode: 'upper' },
-        { label: 'lowercase', mode: 'lower' },
-        { label: 'Title Case', mode: 'title' },
-        { label: 'Sentence case', mode: 'sentence' },
-        { label: 'tOGGLE cASE', mode: 'toggle' },
+    const fontFamilies = [
+        'Arial', 'Calibri', 'Times New Roman', 'Georgia', 'Inter', 
+        'Roboto', 'Courier New', 'Verdana', 'Trebuchet MS'
     ];
+    const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 36, 48, 72];
+    const lineSpacings = [1.0, 1.15, 1.5, 2.0, 2.5, 3.0];
+
+    const currentFont = fmt.fontFamily || 'Calibri';
+    const currentSize = fmt.fontSize || 12;
+
+    const popoverStyle = getBalloonPopoverStyle(isDark);
+    const itemBtnStyle = getBalloonItemBtnStyle(isDark);
+    const sepStyle = getSeparatorStyle(isDark);
+    const btnStyle = (active: boolean) => balloonBtnStyle(active, isDark);
+    const trigStyle = (active: boolean) => balloonTriggerStyle(active, isDark);
+
+
     return (
-        <div style={{ position: 'relative' }}>
-            <button onClick={() => setOpen(o => !o)} style={ribbonToolBtnStyle} title="Change Case" className="ketikin-editor-ui"><IconChange /></button>
-            {open && (
-                <div className="ketikin-editor-ui" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 9999, backgroundColor: 'white', border: '1px solid #d2d0ce', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: '150px' }}>
-                    {cases.map(c => (
-                        <div key={c.mode} onClick={() => { editor?.changeCase(c.mode); setOpen(false); }}
-                            style={{ padding: '6px 12px', fontSize: '13px', cursor: 'pointer' }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f3f2f1')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'white')}
-                        >{c.label}</div>
-                    ))}
-                </div>
-            )}
+        <div 
+            ref={toolbarRef}
+            className="ketikin-editor-ui sticky-balloon-toolbar"
+            style={{ 
+                width: '100%',
+                backgroundColor: isDark ? 'rgba(18, 18, 22, 0.88)' : 'rgba(255, 255, 255, 0.94)', 
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.12)',
+                borderRadius: '16px',
+                padding: '6px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '6px',
+                userSelect: 'none',
+                boxShadow: isDark 
+                  ? '0 12px 36px 0 rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)' 
+                  : '0 10px 30px 0 rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+                backdropFilter: 'blur(16px)',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                color: isDark ? '#ffffff' : '#0f172a'
+            }}
+            onMouseDown={e => {
+                if (!(e.target as HTMLElement).closest('input')) {
+                    e.preventDefault();
+                }
+            }}
+        >
+
+            {/* 1. History Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <button
+                    onClick={() => editor?.undo()}
+                    style={btnStyle(false)}
+                    title="Undo (Ctrl+Z)"
+                >
+                    <IconUndo />
+                </button>
+                <button
+                    onClick={() => editor?.redo()}
+                    style={btnStyle(false)}
+                    title="Redo (Ctrl+Y)"
+                >
+                    <IconRedo />
+                </button>
+            </div>
+
+            <div style={sepStyle} />
+
+            {/* 2. Quick Text Formats */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <button
+                    onClick={() => editor?.toggleFormat('bold')}
+                    style={btnStyle(!!fmt.bold)}
+                    title="Tebal / Bold (Ctrl+B)"
+                >
+                    <IconBold />
+                </button>
+                <button
+                    onClick={() => editor?.toggleFormat('italic')}
+                    style={btnStyle(!!fmt.italic)}
+                    title="Miring / Italic (Ctrl+I)"
+                >
+                    <IconItalic />
+                </button>
+                <button
+                    onClick={() => editor?.toggleFormat('underline')}
+                    style={btnStyle(!!fmt.underline)}
+                    title="Garis Bawah / Underline (Ctrl+U)"
+                >
+                    <IconUnderline />
+                </button>
+            </div>
+
+            <div style={sepStyle} />
+
+            {/* 3. Balloon: Font & Typography */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    onClick={() => toggleBalloon('font')}
+                    style={trigStyle(activeBalloon === 'font')}
+                    title="Pengaturan Font & Tipografi"
+                >
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#a78bfa' : '#4f46e5', marginRight: '4px' }}>A</span>
+                    <span style={{ fontSize: '11px', maxWidth: '70px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {currentFont} ({currentSize})
+                    </span>
+                    <IconChevronDown />
+                </button>
+
+                {activeBalloon === 'font' && (
+                    <div style={popoverStyle}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: isDark ? '#a1a1aa' : '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
+                            Font & Tipografi
+                        </div>
+
+                        {/* Font Family List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '140px', overflowY: 'auto', marginBottom: '10px' }}>
+                            {fontFamilies.map(font => (
+                                <div
+                                    key={font}
+                                    onClick={() => { editor?.setFontFamily(font); }}
+                                    style={{
+                                        padding: '5px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        fontFamily: font,
+                                        cursor: 'pointer',
+                                        backgroundColor: currentFont === font ? (isDark ? '#3b0764' : '#eff6ff') : 'transparent',
+                                        color: currentFont === font ? (isDark ? '#e9d5ff' : '#1d4ed8') : (isDark ? '#e4e4e7' : '#1e293b'),
+                                        fontWeight: currentFont === font ? '600' : 'normal'
+                                    }}
+                                >
+                                    {font}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Font Size Buttons */}
+                        <div style={{ fontSize: '11px', color: isDark ? '#71717a' : '#64748b', marginBottom: '4px' }}>Ukuran Font:</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
+                            {fontSizes.map(sz => (
+                                <button
+                                    key={sz}
+                                    onClick={() => editor?.setFontSize(sz)}
+                                    style={{
+                                        padding: '3px 6px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        border: isDark ? '1px solid #3f3f46' : '1px solid #cbd5e1',
+                                        backgroundColor: currentSize === sz ? (isDark ? '#7c3aed' : '#2563eb') : (isDark ? '#18181b' : '#f1f5f9'),
+                                        color: currentSize === sz ? 'white' : (isDark ? 'white' : '#1e293b'),
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {sz}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Font Colors & Effects */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '8px', borderTop: isDark ? '1px solid #27272a' : '1px solid #e2e8f0' }}>
+                            <button
+                                onClick={() => fontColorRef.current?.click()}
+                                style={itemBtnStyle}
+                                title="Warna Teks"
+                            >
+                                <IconFontColor />
+                                <span style={{ fontSize: '11px', marginLeft: '4px' }}>Warna Teks</span>
+                            </button>
+                            <input
+                                ref={fontColorRef}
+                                type="color"
+                                value={fmt.color || '#000000'}
+                                onChange={e => editor?.setFontColor(e.target.value)}
+                                style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                            />
+
+                            <button
+                                onClick={() => highlightColorRef.current?.click()}
+                                style={itemBtnStyle}
+                                title="Warna Sorotan (Highlight)"
+                            >
+                                <IconHighlight />
+                                <span style={{ fontSize: '11px', marginLeft: '4px' }}>Highlight</span>
+                            </button>
+                            <input
+                                ref={highlightColorRef}
+                                type="color"
+                                value={fmt.backgroundColor || '#ffff00'}
+                                onChange={e => editor?.setHighlightColor(e.target.value)}
+                                style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                            <button onClick={() => editor?.toggleFormat('strikethrough')} style={btnStyle(!!fmt.strikethrough)} title="Coret / Strikethrough">
+                                <IconStrikethrough />
+                            </button>
+                            <button onClick={() => editor?.toggleFormat('subscript')} style={btnStyle(!!fmt.subscript)} title="Subscript">
+                                <IconSubscript />
+                            </button>
+                            <button onClick={() => editor?.toggleFormat('superscript')} style={btnStyle(!!fmt.superscript)} title="Superscript">
+                                <IconSuperscript />
+                            </button>
+                            <button onClick={() => editor?.clearFormatting()} style={btnStyle(false)} title="Hapus Format">
+                                <IconClearFormatting />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* 4. Balloon: Paragraph & Alignment */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    onClick={() => toggleBalloon('paragraph')}
+                    style={trigStyle(activeBalloon === 'paragraph')}
+                    title="Perataan Paragraf & Jarak Baris"
+                >
+                    <IconAlignLeft />
+                    <span style={{ fontSize: '11px', marginLeft: '4px' }}>Paragraf</span>
+                    <IconChevronDown />
+                </button>
+
+                {activeBalloon === 'paragraph' && (
+                    <div style={popoverStyle}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: isDark ? '#a1a1aa' : '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
+                            Perataan Teks
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+                            <button onClick={() => editor?.setAlignment('left')} style={btnStyle(fmt.align === 'left')} title="Rata Kiri">
+                                <IconAlignLeft />
+                            </button>
+                            <button onClick={() => editor?.setAlignment('center')} style={btnStyle(fmt.align === 'center')} title="Rata Tengah">
+                                <IconAlignCenter />
+                            </button>
+                            <button onClick={() => editor?.setAlignment('right')} style={btnStyle(fmt.align === 'right')} title="Rata Kanan">
+                                <IconAlignRight />
+                            </button>
+                            <button onClick={() => editor?.setAlignment('justify')} style={btnStyle(fmt.align === 'justify')} title="Rata Kiri Kanan (Justify)">
+                                <IconAlignJustify />
+                            </button>
+                        </div>
+
+                        <div style={{ fontSize: '11px', color: isDark ? '#71717a' : '#64748b', marginBottom: '4px' }}>Spasi Baris (Line Spacing):</div>
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                            {lineSpacings.map(sp => (
+                                <button
+                                    key={sp}
+                                    onClick={() => editor?.setLineSpacing(sp)}
+                                    style={{
+                                        padding: '3px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        border: isDark ? '1px solid #3f3f46' : '1px solid #cbd5e1',
+                                        backgroundColor: fmt.lineHeight === sp ? (isDark ? '#7c3aed' : '#2563eb') : (isDark ? '#18181b' : '#f1f5f9'),
+                                        color: fmt.lineHeight === sp ? 'white' : (isDark ? 'white' : '#1e293b'),
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {sp.toFixed(2)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* 5. Balloon: Insert Menu */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    onClick={() => toggleBalloon('insert')}
+                    style={trigStyle(activeBalloon === 'insert')}
+                    title="Sisipkan Berkas / Gambar"
+                >
+                    <IconPlus />
+                    <span style={{ fontSize: '11px', marginLeft: '4px' }}>Sisipkan</span>
+                    <IconChevronDown />
+                </button>
+
+                {activeBalloon === 'insert' && (
+                    <div style={popoverStyle}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: isDark ? '#a1a1aa' : '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
+                            Sisipkan Elemen
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <button
+                                onClick={() => { onImportClick(); setActiveBalloon(null); }}
+                                style={{ ...itemBtnStyle, justifyContent: 'flex-start', padding: '8px 10px' }}
+                            >
+                                <IconExport />
+                                <div style={{ textAlign: 'left', marginLeft: '8px' }}>
+                                    <div style={{ fontSize: '12px', fontWeight: 600 }}>Import Dokumen</div>
+                                    <div style={{ fontSize: '10px', color: isDark ? '#71717a' : '#64748b' }}>Docx, PDF, atau TXT</div>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => { onImageInsertClick?.(); setActiveBalloon(null); }}
+                                style={{ ...itemBtnStyle, justifyContent: 'flex-start', padding: '8px 10px' }}
+                            >
+                                <IconPlus />
+                                <div style={{ textAlign: 'left', marginLeft: '8px' }}>
+                                    <div style={{ fontSize: '12px', fontWeight: 600 }}>Sisipkan Gambar</div>
+                                    <div style={{ fontSize: '10px', color: isDark ? '#71717a' : '#64748b' }}>PNG, JPG, WebP</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* 6. Balloon: Page Layout */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    onClick={() => { onLayoutClick(); }}
+                    style={trigStyle(false)}
+                    title="Pengaturan Halaman & Margin"
+                >
+                    <IconPosition />
+                    <span style={{ fontSize: '11px', marginLeft: '4px' }}>Tata Letak</span>
+                </button>
+            </div>
+
+            {/* 7. Balloon: Search & Replace */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    onClick={() => toggleBalloon('find')}
+                    style={trigStyle(activeBalloon === 'find')}
+                    title="Cari & Ganti Teks"
+                >
+                    <IconFind />
+                </button>
+
+                {activeBalloon === 'find' && (
+                    <FindBalloonPanel editor={editor} isDark={isDark} onClose={() => setActiveBalloon(null)} />
+                )}
+            </div>
         </div>
     );
 };
 
-const FindReplacePanel: React.FC<{ editor: Editor | null; onClose: () => void }> = ({ editor, onClose }) => {
+// ── Find & Replace Mini Balloon ─────────────────────────────────────────────
+const FindBalloonPanel: React.FC<{ editor: Editor | null; isDark?: boolean; onClose: () => void }> = ({ editor, isDark = true, onClose }) => {
     const [findTerm, setFindTerm] = useState('');
     const [replaceTerm, setReplaceTerm] = useState('');
     const [msg, setMsg] = useState('');
 
+    const popoverStyle = getBalloonPopoverStyle(isDark);
+    const itemBtnStyle = getBalloonItemBtnStyle(isDark);
+    const inStyle = getInputStyle(isDark);
+
     const doFind = () => {
         if (!findTerm) return;
         const found = editor?.findNext(findTerm);
-        setMsg(found ? '' : 'Not found');
+        setMsg(found ? 'Ditemukan' : 'Tidak ditemukan');
     };
+
     const doReplace = () => {
         if (!findTerm) return;
         const count = editor?.replaceText(findTerm, replaceTerm) ?? 0;
-        setMsg(`Replaced ${count} occurrence${count !== 1 ? 's' : ''}`);
+        setMsg(`Mengganti ${count} kata`);
     };
 
     return (
-        <div className="ketikin-editor-ui" style={{ position: 'fixed', top: '180px', right: '20px', zIndex: 10000, background: 'white', border: '1px solid #d2d0ce', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '16px', minWidth: '280px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontWeight: 600, fontSize: '14px' }}>Find & Replace</span>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#605e5c' }}>✕</button>
+        <div style={{ ...popoverStyle, width: '260px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontWeight: 700, fontSize: '12px', color: isDark ? '#e4e4e7' : '#1e293b' }}>Cari & Ganti Teks</span>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: isDark ? '#71717a' : '#94a3b8', cursor: 'pointer' }}>✕</button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <input value={findTerm} onChange={e => { setFindTerm(e.target.value); setMsg(''); }} placeholder="Find..." onKeyDown={e => e.key === 'Enter' && doFind()}
-                    style={{ padding: '6px 10px', border: '1px solid #d2d0ce', borderRadius: '4px', fontSize: '13px' }} />
-                <input value={replaceTerm} onChange={e => setReplaceTerm(e.target.value)} placeholder="Replace with..." onKeyDown={e => e.key === 'Enter' && doReplace()}
-                    style={{ padding: '6px 10px', border: '1px solid #d2d0ce', borderRadius: '4px', fontSize: '13px' }} />
-                {msg && <div style={{ fontSize: '12px', color: msg.startsWith('Replaced') ? '#107c10' : '#a4262c' }}>{msg}</div>}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={doFind} style={{ flex: 1, padding: '6px', background: '#f3f2f1', border: '1px solid #d2d0ce', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Find Next</button>
-                    <button onClick={doReplace} style={{ flex: 1, padding: '6px', background: '#185abd', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Replace All</button>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <input
+                    value={findTerm}
+                    onChange={e => { setFindTerm(e.target.value); setMsg(''); }}
+                    placeholder="Kata yang dicari..."
+                    onKeyDown={e => e.key === 'Enter' && doFind()}
+                    style={inStyle}
+                />
+                <input
+                    value={replaceTerm}
+                    onChange={e => setReplaceTerm(e.target.value)}
+                    placeholder="Ganti dengan..."
+                    onKeyDown={e => e.key === 'Enter' && doReplace()}
+                    style={inStyle}
+                />
+                {msg && <div style={{ fontSize: '11px', color: isDark ? '#a78bfa' : '#4f46e5' }}>{msg}</div>}
+
+                <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                    <button onClick={doFind} style={{ ...itemBtnStyle, flex: 1, padding: '5px' }}>Cari</button>
+                    <button onClick={doReplace} style={{ ...itemBtnStyle, flex: 1, padding: '5px', backgroundColor: isDark ? '#7c3aed' : '#2563eb', color: 'white' }}>Ganti Semua</button>
                 </div>
             </div>
         </div>
     );
+
 };
 
-// ── Main Ribbon ────────────────────────────────────────────────────────────
+// ── Styles ──────────────────────────────────────────────────────────────────
+const balloonBtnStyle = (active: boolean, isDark: boolean = true): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+    borderRadius: '6px',
+    border: 'none',
+    backgroundColor: active ? (isDark ? '#7c3aed' : '#2563eb') : 'transparent',
+    color: active ? 'white' : (isDark ? '#a1a1aa' : '#64748b'),
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    outline: 'none',
+});
 
-export const Ribbon: React.FC<RibbonProps> = ({ editor, activeTab, setActiveTab, onLayoutClick, onImportClick, onImageInsertClick }) => {
-    const [showFindReplace, setShowFindReplace] = useState(false);
-    const fmt = (editor?.getActiveFormats() as any) || {};
-    const activeBtn = (active: boolean) => ({ ...ribbonToolBtnStyle, backgroundColor: active ? '#cde6ff' : 'transparent', fontWeight: active ? 600 : 400 });
+const balloonTriggerStyle = (active: boolean, isDark: boolean = true): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: '3px',
+    padding: '4px 8px',
+    height: '28px',
+    borderRadius: '6px',
+    border: active 
+      ? (isDark ? '1px solid #7c3aed' : '1px solid #3b82f6') 
+      : (isDark ? '1px solid #27272a' : '1px solid #e2e8f0'),
+    backgroundColor: active 
+      ? (isDark ? '#1e1b4b' : '#eff6ff') 
+      : (isDark ? '#18181b' : '#f8fafc'),
+    color: active 
+      ? (isDark ? '#e9d5ff' : '#1d4ed8') 
+      : (isDark ? '#d4d4d8' : '#334155'),
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    outline: 'none',
+});
 
-    const renderHomeTab = () => (
-        <div style={{ display: 'flex', gap: '20px', padding: '10px', height: '110px' }}>
+const getBalloonPopoverStyle = (isDark: boolean = true): React.CSSProperties => ({
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    left: 0,
+    zIndex: 99999,
+    backgroundColor: isDark ? '#121215' : '#ffffff',
+    border: isDark ? '1px solid #27272a' : '1px solid #e2e8f0',
+    borderRadius: '12px',
+    boxShadow: isDark 
+      ? '0 10px 30px -5px rgba(0,0,0,0.8), 0 0 1px 1px rgba(255,255,255,0.05)' 
+      : '0 10px 30px -5px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05)',
+    padding: '12px',
+    minWidth: '220px',
+    backdropFilter: 'blur(16px)',
+    color: isDark ? '#e4e4e7' : '#1e293b',
+});
 
-            {/* ── Clipboard ── */}
-            <div style={ribbonGroupStyle}>
-                <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-                    <button
-                        onClick={() => editor?.pasteFromClipboard()}
-                        style={ribbonBigBtnStyle}
-                        title="Paste (Ctrl+V)"
-                        className="ketikin-editor-ui"
-                    >
-                        <IconPaste /><div style={{ marginTop: '4px' }}>Paste</div>
-                    </button>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <button onClick={() => editor?.cutToClipboard()} style={ribbonSmallBtnStyle} title="Cut (Ctrl+X)" className="ketikin-editor-ui"><IconCut /> Cut</button>
-                        <button onClick={() => editor?.copyToClipboard()} style={ribbonSmallBtnStyle} title="Copy (Ctrl+C)" className="ketikin-editor-ui"><IconCopy /> Copy</button>
-                        <button onClick={() => editor?.clearFormatting()} style={ribbonSmallBtnStyle} title="Format Painter / Clear format" className="ketikin-editor-ui"><IconFormatPainter /> Format Painter</button>
-                    </div>
-                </div>
-                <div style={ribbonLabelStyle}>Clipboard</div>
-            </div>
+const getBalloonItemBtnStyle = (isDark: boolean = true): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '6px 10px',
+    borderRadius: '6px',
+    border: isDark ? '1px solid #27272a' : '1px solid #e2e8f0',
+    backgroundColor: isDark ? '#18181b' : '#f8fafc',
+    color: isDark ? '#e4e4e7' : '#1e293b',
+    cursor: 'pointer',
+    outline: 'none',
+    fontSize: '11px',
+    transition: 'all 0.15s ease',
+});
 
-            {/* ── Font ── */}
-            <div style={ribbonGroupStyle}>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
-                    <FontFamilyDropdown editor={editor} />
-                    <FontSizeInput editor={editor} />
-                    <button onClick={() => editor?.setFontSize((fmt.fontSize || 16) + 1)} style={ribbonToolBtnStyle} title="Increase Font Size" className="ketikin-editor-ui"><IconPlus /></button>
-                    <button onClick={() => editor?.setFontSize(Math.max(1, (fmt.fontSize || 16) - 1))} style={ribbonToolBtnStyle} title="Decrease Font Size" className="ketikin-editor-ui"><IconMinus /></button>
-                </div>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button onClick={() => editor?.toggleFormat('bold')}          style={activeBtn(!!fmt.bold)}          title="Bold (Ctrl+B)"    className="ketikin-editor-ui"><IconBold /></button>
-                    <button onClick={() => editor?.toggleFormat('italic')}        style={activeBtn(!!fmt.italic)}        title="Italic (Ctrl+I)"  className="ketikin-editor-ui"><IconItalic /></button>
-                    <button onClick={() => editor?.toggleFormat('underline')}     style={activeBtn(!!fmt.underline)}     title="Underline (Ctrl+U)" className="ketikin-editor-ui"><IconUnderline /></button>
-                    <button onClick={() => editor?.toggleFormat('strikethrough')} style={activeBtn(!!fmt.strikethrough)} title="Strikethrough"    className="ketikin-editor-ui"><IconStrikethrough /></button>
-                    <button onClick={() => editor?.toggleFormat('subscript')}     style={activeBtn(!!fmt.subscript)}     title="Subscript"        className="ketikin-editor-ui"><IconSubscript /></button>
-                    <button onClick={() => editor?.toggleFormat('superscript')}   style={activeBtn(!!fmt.superscript)}   title="Superscript"      className="ketikin-editor-ui"><IconSuperscript /></button>
-                    <CaseMenu editor={editor} />
-                    <button onClick={() => editor?.clearFormatting()} style={ribbonToolBtnStyle} title="Clear Formatting" className="ketikin-editor-ui"><IconClearFormatting /></button>
-                    <ColorPicker label="Highlight" current={fmt.backgroundColor} onPick={c => editor?.setHighlightColor(c)} icon={<IconHighlight />} />
-                    <ColorPicker label="Font Color" current={fmt.color}          onPick={c => editor?.setFontColor(c)}      icon={<IconFontColor />} />
-                </div>
-                <div style={ribbonLabelStyle}>Font</div>
-            </div>
+const getSeparatorStyle = (isDark: boolean = true): React.CSSProperties => ({
+    width: '1px',
+    height: '18px',
+    backgroundColor: isDark ? '#27272a' : '#e2e8f0',
+    margin: '0 4px',
+});
 
-            {/* ── Paragraph ── */}
-            <div style={ribbonGroupStyle}>
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                    <button onClick={() => editor?.toggleList('bullet')} style={activeBtn(fmt.listType === 'bullet')} title="Bullet List" className="ketikin-editor-ui"><IconBulletList /></button>
-                    <button onClick={() => editor?.toggleList('number')} style={activeBtn(fmt.listType === 'number')} title="Numbered List" className="ketikin-editor-ui"><IconNumberList /></button>
-                    <button onClick={() => editor?.setAlignment('left')}    style={activeBtn(fmt.align === 'left' || !fmt.align)}    title="Align Left"    className="ketikin-editor-ui"><IconAlignLeft /></button>
-                    <button onClick={() => editor?.setAlignment('center')}  style={activeBtn(fmt.align === 'center')}  title="Align Center"  className="ketikin-editor-ui"><IconAlignCenter /></button>
-                    <button onClick={() => editor?.setAlignment('right')}   style={activeBtn(fmt.align === 'right')}   title="Align Right"   className="ketikin-editor-ui"><IconAlignRight /></button>
-                    <button onClick={() => editor?.setAlignment('justify')} style={activeBtn(fmt.align === 'justify')} title="Justify"       className="ketikin-editor-ui"><IconAlignJustify /></button>
-                    <LineSpacingMenu editor={editor} />
-                </div>
-                <div style={ribbonLabelStyle}>Paragraph</div>
-            </div>
+const getInputStyle = (isDark: boolean = true): React.CSSProperties => ({
+    padding: '6px 8px',
+    backgroundColor: isDark ? '#18181b' : '#ffffff',
+    border: isDark ? '1px solid #27272a' : '1px solid #cbd5e1',
+    borderRadius: '6px',
+    color: isDark ? 'white' : '#0f172a',
+    fontSize: '12px',
+    outline: 'none',
+});
 
-            {/* ── Styles ── */}
-            <div style={ribbonGroupStyle}>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                    {([
-                        { label: 'Normal',   style: 'Normal',   preview: { fontSize: '14px', fontWeight: 'normal' } },
-                        { label: 'No Spacing', style: 'NoSpacing', preview: { fontSize: '14px', fontWeight: 'normal' } },
-                        { label: 'Heading 1', style: 'Heading1', preview: { fontSize: '14px', fontWeight: 'bold', color: '#2e74b5' } },
-                        { label: 'Heading 2', style: 'Heading2', preview: { fontSize: '13px', fontWeight: 'bold', color: '#2e74b5' } },
-                    ] as const).map(s => (
-                        <div
-                            key={s.label}
-                            onClick={() => editor?.applyStyle(s.style)}
-                            style={{ ...galleryItemStyle, cursor: 'pointer' }}
-                            title={`Apply ${s.label} style`}
-                            className="ketikin-editor-ui"
-                        >
-                            <div style={{ fontSize: '9px', color: '#666', borderBottom: '1px solid #efefef', marginBottom: '4px' }}>{s.label}</div>
-                            <div style={s.preview}>AaBbCc</div>
-                        </div>
-                    ))}
-                </div>
-                <div style={ribbonLabelStyle}>Styles</div>
-            </div>
-
-            {/* ── Editing ── */}
-            <div style={ribbonGroupStyle}>
-                <button onClick={() => setShowFindReplace(true)}  style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconFind />    Find</button>
-                <button onClick={() => setShowFindReplace(true)}  style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconReplace /> Replace</button>
-                <button onClick={() => editor?.selectAll()}        style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconSelect />  Select All</button>
-                <div style={ribbonLabelStyle}>Editing</div>
-            </div>
-        </div>
-    );
-
-    const renderPictureTab = () => (
-        <div style={{ display: 'flex', gap: '20px', padding: '10px', height: '110px' }}>
-            <div style={ribbonGroupStyle}>
-                <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-                    <button style={ribbonBigBtnStyle} className="ketikin-editor-ui"><IconRemoveBG /><div style={{ marginTop: '4px' }}>Remove Background</div></button>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconBrightness /> Corrections</button>
-                        <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconColor /> Color</button>
-                        <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconArtistic /> Artistic Effects</button>
-                    </div>
-                </div>
-                <div style={ribbonLabelStyle}>Adjust</div>
-            </div>
-            <div style={ribbonGroupStyle}>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                    {[1, 2, 3, 4, 5].map(i => <div key={i} style={galleryItemStyle} />)}
-                </div>
-                <div style={ribbonLabelStyle}>Picture Styles</div>
-            </div>
-            <div style={ribbonGroupStyle}>
-                <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconBorder /> Picture Border</button>
-                <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconEffects /> Picture Effects</button>
-                <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconLayoutOptions /> Picture Layout</button>
-                <div style={ribbonLabelStyle}>Styles</div>
-            </div>
-            <div style={ribbonGroupStyle}>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconPosition /> Position</button>
-                        <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconWrap /> Wrap Text</button>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconBringForward /> Bring Forward</button>
-                        <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconSendBackward /> Send Backward</button>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <button style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconSelect /> Selection Pane</button>
-                        <button onClick={() => editor?.rotateSelectedElement(90)} style={ribbonSmallBtnStyle} className="ketikin-editor-ui"><IconRotate /> Rotate</button>
-                    </div>
-                </div>
-                <div style={ribbonLabelStyle}>Arrange</div>
-            </div>
-            <div style={ribbonGroupStyle}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button style={{ ...ribbonBigBtnStyle, width: '50px' }} className="ketikin-editor-ui"><IconCrop /><div style={{ marginTop: '4px' }}>Crop</div></button>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={ribbonDropdownStyle}>Height: 4.5 cm</div>
-                        <div style={ribbonDropdownStyle}>Width: 6.2 cm</div>
-                    </div>
-                </div>
-                <div style={ribbonLabelStyle}>Size</div>
-            </div>
-        </div>
-    );
-
-    const renderFileTab = () => (
-        <div style={{ display: 'flex', gap: '20px', padding: '10px', height: '110px' }}>
-            <div style={ribbonGroupStyle}>
-                <button onClick={onImportClick} style={ribbonBigBtnStyle} className="ketikin-editor-ui"><IconPlus /><div style={{ marginTop: '4px' }}>Open</div></button>
-            </div>
-            <div style={ribbonGroupStyle}>
-                <button onClick={() => (window as any).ketikinSave?.()} style={ribbonBigBtnStyle} className="ketikin-editor-ui"><IconExport /><div style={{ marginTop: '4px' }}>Save</div></button>
-            </div>
-        </div>
-    );
-
-    const tabs = ['File', 'Home', 'Insert', 'Draw', 'Design', 'Layout', 'References', 'Mailings', 'Review', 'View', 'Help'];
-    if (editor?.selectedElementIndex !== null && editor?.elements[editor.selectedElementIndex!]?.elementType === 'image') {
-        tabs.push('Picture Format');
-    }
-
-    return (
-        <>
-            {showFindReplace && <FindReplacePanel editor={editor} onClose={() => setShowFindReplace(false)} />}
-
-            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid #d2d0ce', flexShrink: 0, backgroundColor: '#f3f2f1' }}>
-                {/* Title bar */}
-                <div style={{ height: '32px', backgroundColor: '#185abd', display: 'flex', alignItems: 'center', padding: '0 10px', gap: '15px' }}>
-                    <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', marginRight: '20px' }}>Ketikin Editor</div>
-                    <button onClick={() => editor?.undo()} style={ribbonBtnStyle} title="Undo (Ctrl+Z)" className="ketikin-editor-ui"><IconUndo /></button>
-                    <button onClick={() => editor?.redo()} style={ribbonBtnStyle} title="Redo (Ctrl+Y)" className="ketikin-editor-ui"><IconRedo /></button>
-                    <button onClick={() => (window as any).ketikinSave?.()} style={ribbonBtnStyle} title="Save (Ctrl+S)" className="ketikin-editor-ui"><IconExport /></button>
-                </div>
-
-                {/* Tab bar */}
-                <div style={{ display: 'flex', backgroundColor: '#f3f2f1', padding: '0 5px', height: '30px', alignItems: 'center' }}>
-                    {tabs.map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className="ketikin-editor-ui"
-                            style={{
-                                background: 'transparent', border: 'none',
-                                borderBottom: activeTab === tab ? '2px solid #185abd' : '2px solid transparent',
-                                color: activeTab === tab ? '#185abd' : '#323130',
-                                padding: '5px 12px', fontSize: '13px', cursor: 'pointer', height: '30px',
-                                fontWeight: activeTab === tab ? '600' : 'normal',
-                                backgroundColor: activeTab === tab ? 'white' : 'transparent', outline: 'none'
-                            }}
-                        >{tab}</button>
-                    ))}
-                </div>
-
-                {/* Tab content */}
-                <div style={{ backgroundColor: 'white', height: '110px' }}>
-                    {activeTab === 'File'           && renderFileTab()}
-                    {activeTab === 'Home'           && renderHomeTab()}
-                    {activeTab === 'Insert'         && (
-                        <div style={{ display: 'flex', gap: '20px', padding: '10px', height: '110px' }}>
-                            <div style={ribbonGroupStyle}>
-                                <button onClick={onImportClick} style={ribbonBigBtnStyle} title="Import Docx/PDF/TXT" className="ketikin-editor-ui"><IconPlus /><div style={{ marginTop: '4px' }}>Import File</div></button>
-                            </div>
-                            <div style={ribbonGroupStyle}>
-                                <button onClick={onImageInsertClick} style={ribbonBigBtnStyle} title="Insert Image" className="ketikin-editor-ui"><IconPlus /><div style={{ marginTop: '4px' }}>Insert Image</div></button>
-                            </div>
-                        </div>
-                    )}
-                    {activeTab === 'Picture Format' && renderPictureTab()}
-                    {activeTab === 'Layout'         && (
-                        <div style={{ padding: '10px' }}>
-                            <button onClick={onLayoutClick} style={ribbonBigBtnStyle} className="ketikin-editor-ui"><IconPosition /><div>Page Setup</div></button>
-                        </div>
-                    )}
-                    {!['File', 'Home', 'Picture Format', 'Insert', 'Layout'].includes(activeTab) && (
-                        <div style={{ padding: '20px', color: '#999', fontSize: '13px' }}>{activeTab} tab content (placeholder)</div>
-                    )}
-                </div>
-            </div>
-        </>
-    );
-};
